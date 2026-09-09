@@ -246,11 +246,38 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
               <i className={`fa-solid ${badge.icon} text-[8px]`} />
               <span className="tracking-tight">{badge.short}</span>
             </div>
-            {typeof hours === 'number' && hours > 0 && isCurrentMonth && (
-              <div className="text-center text-[8px] font-mono text-slate-400 leading-none">
-                {hours}h
-              </div>
-            )}
+            {typeof hours === 'number' && hours > 0 && isCurrentMonth && (() => {
+              // WORK: mostrar jornada + sobre-jornada (ej. 12h + 4)
+              // EXTRA: todo el bloque es día extra
+              if (type === 'WORK') {
+                const normal = Math.min(hours, normalHours);
+                const over = Math.max(0, hours - normalHours);
+                return (
+                  <div className="text-center leading-tight">
+                    <div className="text-[8px] font-mono text-sky-300/90">
+                      {normal}h
+                    </div>
+                    {over > 0 && (
+                      <div className="text-[8px] font-mono font-semibold text-amber-400">
+                        +{over}h
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (type === 'EXTRA') {
+                return (
+                  <div className="text-center text-[8px] font-mono font-semibold text-amber-400 leading-none">
+                    {hours}h
+                  </div>
+                );
+              }
+              return (
+                <div className="text-center text-[8px] font-mono text-slate-400 leading-none">
+                  {hours}h
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <div className="mt-auto h-4 flex items-center justify-center text-[10px] text-slate-700">
