@@ -89,7 +89,7 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
   const currentMonth = viewMonth ?? internalMonth;
   const currentYear = viewYear ?? internalYear;
   const [editorDate, setEditorDate] = useState<string | null>(null);
-  const [showSummary, setShowSummary] = useState(true);
+  const [showSummary, setShowSummary] = useState(false);
 
   const daysInMonth = useMemo(
     () => getDaysInMonth(currentYear, currentMonth),
@@ -331,7 +331,7 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
       {/* Month Navigation & Stats Header */}
       <div className="bg-slate-900 px-4 pt-3 pb-2">
         <div className="flex items-center justify-between mb-3">
@@ -431,7 +431,7 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
       </div>
 
       {/* Calendar Grid */}
-      <main className="flex-1 px-3 py-2 flex flex-col min-h-0">
+      <main className="px-3 py-2 flex flex-col shrink-0">
         <div className="grid grid-cols-7 gap-1 text-center mb-1">
           {['Lun', 'Mar', 'Mié', 'Jue', 'Vie'].map(d => (
             <span
@@ -450,7 +450,7 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
         </div>
         <div
           id="calendar-days"
-          className="grid grid-cols-7 gap-1 flex-1 content-start select-none"
+          className="grid grid-cols-7 gap-1 content-start select-none"
         >
           {calendarDays.map(renderDayCell)}
         </div>

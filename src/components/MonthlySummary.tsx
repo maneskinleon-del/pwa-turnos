@@ -15,10 +15,10 @@ export function MonthlySummaryPanel({ summary }: Props) {
   };
 
   return (
-    <div className="mx-3 mb-3 rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-xs space-y-3">
+    <div className="mx-3 mb-3 mt-1 rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs space-y-3 shrink-0">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white tracking-tight">
-          Resumen · {summary.monthLabel}
+          Resumen rápido
         </h3>
         <button
           type="button"
