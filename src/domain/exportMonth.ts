@@ -19,6 +19,8 @@ export function exportMonthlySummaryCsv(summary: MonthlySummary): string {
   lines.push(`dias_liquidados,${summary.liquidationDays}`);
   lines.push(`turnos_normales,${summary.normalShiftDays}`);
   lines.push(`turnos_extras,${summary.extraShiftDays}`);
+  lines.push(`dias_trabajados_normales,${summary.normalShiftDays}`);
+  lines.push(`dias_trabajados_extra,${summary.extraShiftDays}`);
   lines.push(`dias_efectivos_trabajados,${summary.effectiveWorkedDays}`);
   lines.push(`turnos_extra_realizados,${summary.extras.realized}`);
   lines.push(`turnos_extra_pagados,${summary.extras.paidCount}`);

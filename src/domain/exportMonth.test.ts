@@ -13,6 +13,9 @@ describe('exportMonthlySummaryCsv', () => {
     const summary = buildMonthlySummary(shifts, 2026, 8);
     const csv = exportMonthlySummaryCsv(summary);
     expect(csv).toContain('dias_liquidados,30');
+    expect(csv).toContain('dias_trabajados_normales,1');
+    expect(csv).toContain('dias_trabajados_extra,2');
+    expect(csv).toContain('dias_efectivos_trabajados,3');
     expect(csv).toContain('turnos_extra_pagados,1');
     expect(csv).toContain('turnos_extra_pendientes,1');
     expect(csv).toContain('monto_pagado,40000');
