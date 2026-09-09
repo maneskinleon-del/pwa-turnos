@@ -142,25 +142,17 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
   const hoursSummary = useMemo(() => {
     if (monthHoursSummary) return monthHoursSummary;
     let worked = 0;
+    let normalAcc = 0;
+    let overtimeAcc = 0;
     let daysWithHours = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const key = formatDateKey(new Date(currentYear, currentMonth, d));
       const h = getHoursWorked?.(key);
       if (typeof h === 'number' && h > 0) {
         worked += h;
-        daysWithHours += 1;
-      }
-    }
-    const normal = Math.min(worked, daysWithHours * normalHours); // rough if we don't split per day
-    // Proper per-day split:
-    let normalAcc = 0;
-    let overtimeAcc = 0;
-    for (let d = 1; d <= daysInMonth; d++) {
-      const key = formatDateKey(new Date(currentYear, currentMonth, d));
-      const h = getHoursWorked?.(key);
-      if (typeof h === 'number' && h > 0) {
         normalAcc += Math.min(h, normalHours);
         overtimeAcc += Math.max(0, h - normalHours);
+        daysWithHours += 1;
       }
     }
     return { worked, normal: normalAcc, overtime: overtimeAcc, daysWithHours };
