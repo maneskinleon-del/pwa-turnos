@@ -23,14 +23,14 @@ export function saveShifts(shifts: ShiftDay[]): void {
 }
 
 export function getShift(dateKey: string): ShiftDay | undefined {
-  const shifts = loadShifts();
-  return shifts.find(s => s.date === dateKey);
+  return loadShifts().find(s => s.date === dateKey);
 }
 
 export function setShift(
   dateKey: string,
   type: ShiftType,
-  hoursWorked?: number
+  hoursWorked?: number,
+  paid?: boolean
 ): void {
   const shifts = loadShifts();
   const existingIndex = shifts.findIndex(s => s.date === dateKey);
@@ -47,13 +47,15 @@ export function setShift(
   if (typeof hoursWorked === 'number' && hoursWorked > 0) {
     newShift.hoursWorked = hoursWorked;
   }
+  if (type === 'EXTRA') {
+    newShift.paid = paid === true;
+  }
 
   if (existingIndex >= 0) {
     shifts[existingIndex] = newShift;
   } else {
     shifts.push(newShift);
   }
-
   saveShifts(shifts);
 }
 
@@ -71,21 +73,23 @@ function isValidShiftDay(obj: unknown): obj is ShiftDay {
   );
 }
 
+/** Migra datos antiguos: EXTRA sin paid → pendiente (paid omitido/false). */
 function normalizeShiftDay(day: ShiftDay): ShiftDay {
   const out: ShiftDay = { date: day.date, type: day.type };
   if (typeof day.hoursWorked === 'number' && day.hoursWorked > 0) {
     out.hoursWorked = day.hoursWorked;
   }
+  if (day.type === 'EXTRA' && day.paid === true) {
+    out.paid = true;
+  }
   return out;
 }
 
 export function seedDemoData(): void {
-  const existing = loadShifts();
-  if (existing.length > 0) return;
+  if (loadShifts().length > 0) return;
   seedDemoDataForced();
 }
 
-/** Always writes demo data for the current month (overwrites existing). */
 export function seedDemoDataForced(): void {
   const now = new Date();
   const year = now.getFullYear();
@@ -95,10 +99,10 @@ export function seedDemoDataForced(): void {
   const demo: ShiftDay[] = [
     { date: `${year}-${m}-01`, type: 'WORK', hoursWorked: 12 },
     { date: `${year}-${m}-02`, type: 'REST' },
-    { date: `${year}-${m}-03`, type: 'WORK', hoursWorked: 12 },
-    { date: `${year}-${m}-04`, type: 'EXTRA', hoursWorked: 12 },
+    { date: `${year}-${m}-03`, type: 'WORK', hoursWorked: 16 },
+    { date: `${year}-${m}-04`, type: 'EXTRA', hoursWorked: 12, paid: true },
     { date: `${year}-${m}-05`, type: 'REST' },
+    { date: `${year}-${m}-06`, type: 'EXTRA', hoursWorked: 12, paid: false },
   ];
-
   saveShifts(demo);
 }

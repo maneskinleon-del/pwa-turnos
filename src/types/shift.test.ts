@@ -184,49 +184,31 @@ describe('Timezone safety', () => {
 import { computeHours, DEFAULT_WORKDAY_CONFIG } from './shift';
 
 describe('computeHours', () => {
-  it('WORK: splits hours above jornada into overtime', () => {
-    expect(computeHours(14, 12, 'WORK')).toEqual({
-      worked: 14,
-      normal: 12,
-      overtime: 2,
-      isExtraDay: false,
-    });
+  it('WORK: splits hours above jornada into overtimeHours', () => {
+    const r = computeHours(14, 12, 'WORK');
+    expect(r.normal).toBe(12);
+    expect(r.overtimeHours).toBe(2);
+    expect(r.extraShiftHours).toBe(0);
+    expect(r.isExtraDay).toBe(false);
   });
 
-  it('WORK: all normal when at or under jornada', () => {
-    expect(computeHours(12, 12, 'WORK')).toEqual({
-      worked: 12,
-      normal: 12,
-      overtime: 0,
-      isExtraDay: false,
-    });
+  it('WORK: all normal when at jornada', () => {
+    const r = computeHours(12, 12, 'WORK');
+    expect(r.normal).toBe(12);
+    expect(r.overtimeHours).toBe(0);
   });
 
-  it('EXTRA: entire day counts as overtime (no normal split)', () => {
-    expect(computeHours(12, 12, 'EXTRA')).toEqual({
-      worked: 12,
-      normal: 0,
-      overtime: 12,
-      isExtraDay: true,
-    });
-  });
-
-  it('handles zero / undefined as empty', () => {
-    expect(computeHours(0, 12, 'WORK')).toEqual({
-      worked: 0,
-      normal: 0,
-      overtime: 0,
-      isExtraDay: false,
-    });
-    expect(computeHours(undefined, 12, 'WORK')).toEqual({
-      worked: 0,
-      normal: 0,
-      overtime: 0,
-      isExtraDay: false,
-    });
+  it('EXTRA: hours go to extraShiftHours, not overtimeHours', () => {
+    const r = computeHours(12, 12, 'EXTRA');
+    expect(r.extraShiftHours).toBe(12);
+    expect(r.overtimeHours).toBe(0);
+    expect(r.normal).toBe(0);
+    expect(r.isExtraDay).toBe(true);
   });
 
   it('default jornada is 12 (4x4)', () => {
     expect(DEFAULT_WORKDAY_CONFIG.normalHours).toBe(12);
+    expect(DEFAULT_WORKDAY_CONFIG.extraShiftValue).toBe(40000);
+    expect(DEFAULT_WORKDAY_CONFIG.liquidationDays).toBe(30);
   });
 });

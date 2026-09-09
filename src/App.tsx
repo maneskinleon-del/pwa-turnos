@@ -16,6 +16,7 @@ function App() {
     getShiftType,
     getShift,
     config,
+    shifts,
     reload,
   } = useShifts();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -58,7 +59,6 @@ function App() {
   return (
     <div className="h-full flex flex-col items-center bg-slate-950 font-sans antialiased selection:bg-sky-500 selection:text-white">
       <div className="w-full max-w-md h-full min-h-screen bg-slate-900 border-x border-slate-800/80 flex flex-col relative shadow-2xl overflow-x-hidden">
-        {/* Top App Bar */}
         <header className="sticky top-0 z-20 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-lg border border-sky-500/30">
@@ -68,10 +68,10 @@ function App() {
               <h1 className="text-base font-semibold tracking-tight text-white flex items-center gap-1.5">
                 PWA Turnos
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800/60 uppercase">
-                  Fase 3
+                  Control
                 </span>
               </h1>
-              <p className="text-[11px] text-slate-400">Calendario & Control de Jornadas</p>
+              <p className="text-[11px] text-slate-400">Turnos · Horas · Extras · Feriados</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -103,21 +103,25 @@ function App() {
           onSelectDate={setSelectedDate}
           getShiftType={getShiftType}
           getHoursWorked={dateKey => getShift(dateKey)?.hoursWorked}
+          getPaid={dateKey => getShift(dateKey)?.paid === true}
           normalHours={config.normalHours}
-          onUpdateShift={(dateKey, type, hours) => {
-            updateShift(dateKey, type, hours);
-            const suffix =
-              typeof hours === 'number' && hours > 0 ? ` · ${hours}h` : '';
-            showToast(`Día actualizado: ${type}${suffix}`);
+          config={config}
+          shifts={shifts}
+          onUpdateShift={(dateKey, type, hours, paid) => {
+            updateShift(dateKey, type, hours, paid);
+            const bits = [type];
+            if (typeof hours === 'number' && hours > 0) bits.push(`${hours}h`);
+            if (type === 'EXTRA') bits.push(paid ? 'pagado' : 'pendiente');
+            showToast(`Día: ${bits.join(' · ')}`);
           }}
         />
 
-        {/* Footer */}
         <footer className="p-3 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[11px]">
-              Local · jornada {config.normalHours}h
+              Local · jornada {config.normalHours}h · extra $
+              {config.extraShiftValue.toLocaleString('es-CL')}
             </span>
           </div>
           <button
@@ -129,7 +133,6 @@ function App() {
           </button>
         </footer>
 
-        {/* Toast */}
         <div
           className={`fixed top-16 inset-x-0 mx-auto w-max max-w-[90%] bg-slate-800/95 border border-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded-full shadow-lg pointer-events-none transition-opacity duration-300 flex items-center gap-2 z-50 ${
             toast ? 'opacity-100' : 'opacity-0'

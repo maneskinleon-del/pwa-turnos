@@ -1,24 +1,20 @@
 import { useState, useEffect } from 'react';
 import type { ShiftType } from '@/types/shift';
 import { getMonthName, computeHours, DEFAULT_WORKDAY_CONFIG } from '@/types/shift';
+import { getHoliday } from '@/data/chileHolidays';
 
 interface DayEditorProps {
   dateKey: string;
   currentType: ShiftType;
   currentHours?: number;
+  currentPaid?: boolean;
   normalHours?: number;
-  onSave: (type: ShiftType, hoursWorked?: number) => void;
+  onSave: (type: ShiftType, hoursWorked?: number, paid?: boolean) => void;
   onClose: () => void;
 }
 
 const WEEKDAY_NAMES = [
-  'Domingo',
-  'Lunes',
-  'Martes',
-  'Miércoles',
-  'Jueves',
-  'Viernes',
-  'Sábado',
+  'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado',
 ];
 
 const OPTIONS: {
@@ -32,7 +28,7 @@ const OPTIONS: {
   {
     type: 'WORK',
     label: 'Trabajo',
-    sub: 'Jornada habitual programada',
+    sub: 'Turno normal programado',
     icon: 'fa-briefcase',
     iconBg: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
     badge: 'bg-sky-950 text-sky-300 border-sky-800',
@@ -67,14 +63,15 @@ export function DayEditor({
   dateKey,
   currentType,
   currentHours,
+  currentPaid = false,
   normalHours = DEFAULT_WORKDAY_CONFIG.normalHours,
   onSave,
   onClose,
 }: DayEditorProps) {
   const [selectedType, setSelectedType] = useState<ShiftType>(currentType);
+  const [paid, setPaid] = useState(currentPaid);
   const [hoursInput, setHoursInput] = useState<string>(() => {
     if (currentHours && currentHours > 0) return String(currentHours);
-    // Turno extra: por defecto una jornada completa (ej. 12 h)
     if (currentType === 'EXTRA') return String(normalHours);
     return '';
   });
@@ -84,6 +81,7 @@ export function DayEditor({
   const dateObj = new Date(year, month - 1, day);
   const weekday = WEEKDAY_NAMES[dateObj.getDay()];
   const dateTitle = `${day} de ${getMonthName(month - 1)}, ${year}`;
+  const holiday = getHoliday(dateKey);
 
   const parsedHours = hoursInput === '' ? undefined : Number(hoursInput);
   const hoursValid =
@@ -96,7 +94,6 @@ export function DayEditor({
 
   const selectType = (type: ShiftType) => {
     setSelectedType(type);
-    // Al elegir EXTRA sin horas, rellenar jornada completa
     if (type === 'EXTRA' && (hoursInput === '' || Number(hoursInput) <= 0)) {
       setHoursInput(String(normalHours));
     }
@@ -118,7 +115,11 @@ export function DayEditor({
     if (!hoursValid) return;
     const hours =
       parsedHours !== undefined && parsedHours > 0 ? parsedHours : undefined;
-    onSave(selectedType, hours);
+    onSave(
+      selectedType,
+      hours,
+      selectedType === 'EXTRA' ? paid : undefined
+    );
     onClose();
   };
 
@@ -133,34 +134,25 @@ export function DayEditor({
         onClick={onClose}
         aria-hidden
       />
-
       <div
-        className={`fixed bottom-0 inset-x-0 max-w-md mx-auto z-50 bg-slate-900 border-t border-slate-700/80 rounded-t-2xl shadow-2xl p-5 sheet-transition max-h-[90vh] overflow-y-auto ${
+        className={`fixed bottom-0 inset-x-0 max-w-md mx-auto z-50 bg-slate-900 border-t border-slate-700/80 rounded-t-2xl shadow-2xl p-5 sheet-transition max-h-[92vh] overflow-y-auto ${
           visible ? 'translate-y-0' : 'translate-y-full pointer-events-none'
         }`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-date-title"
       >
-        <div
-          className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-4 cursor-pointer"
-          onClick={onClose}
-        />
+        <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-4 cursor-pointer" onClick={onClose} />
 
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-3">
           <div>
             <span className="text-[10px] font-semibold text-sky-400 tracking-wider uppercase">
               {weekday}
             </span>
-            <h3
-              id="sheet-date-title"
-              className="text-lg font-bold text-white tracking-tight"
-            >
+            <h3 id="sheet-date-title" className="text-lg font-bold text-white tracking-tight">
               {dateTitle}
             </h3>
-            <p className="text-xs text-slate-400">
-              Selecciona el tipo de turno y las horas
-            </p>
+            <p className="text-xs text-slate-400">Tipo de turno, horas y estado de pago</p>
           </div>
           <button
             type="button"
@@ -172,7 +164,28 @@ export function DayEditor({
           </button>
         </div>
 
-        <div className="space-y-2.5 mb-4">
+        {holiday && (
+          <div
+            className={`mb-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${
+              holiday.type === 'IRRENUNCIABLE'
+                ? 'border-rose-700/60 bg-rose-950/40 text-rose-200'
+                : 'border-violet-700/50 bg-violet-950/30 text-violet-200'
+            }`}
+          >
+            <span className="text-sm leading-none mt-0.5">
+              {holiday.type === 'IRRENUNCIABLE' ? '⚠' : '★'}
+            </span>
+            <div>
+              <div className="font-semibold">
+                {holiday.type === 'IRRENUNCIABLE' ? 'Feriado irrenunciable' : 'Feriado'}
+              </div>
+              <div className="opacity-90">{holiday.name}</div>
+              <div className="opacity-70 mt-0.5">No modifica el tipo de turno</div>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2 mb-4">
           {OPTIONS.map(opt => {
             const selected = selectedType === opt.type;
             return (
@@ -187,17 +200,13 @@ export function DayEditor({
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-base border ${opt.iconBg}`}
-                  >
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-base border ${opt.iconBg}`}>
                     <i className={`fa-solid ${opt.icon}`} />
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-slate-100 flex items-center gap-1.5">
                       {opt.label}
-                      <span
-                        className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${opt.badge}`}
-                      >
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${opt.badge}`}>
                         {opt.type}
                       </span>
                     </div>
@@ -206,55 +215,40 @@ export function DayEditor({
                 </div>
                 <span
                   className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                    selected
-                      ? 'border-sky-500 bg-sky-500'
-                      : 'border-slate-600 bg-slate-800'
+                    selected ? 'border-sky-500 bg-sky-500' : 'border-slate-600 bg-slate-800'
                   }`}
                 >
-                  {selected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                  )}
+                  {selected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* Horas (Fase 3) — WORK parte por jornada; EXTRA es día completo */}
         {showHoursField && (
-          <div className="mb-5 p-3 rounded-xl border border-slate-800 bg-slate-950/60">
+          <div className="mb-4 p-3 rounded-xl border border-slate-800 bg-slate-950/60">
             {selectedType === 'EXTRA' ? (
               <>
                 <div className="flex items-start gap-2 mb-2">
                   <i className="fa-solid fa-bolt text-amber-400 text-sm mt-0.5" />
                   <div>
-                    <div className="text-xs font-semibold text-amber-300">
-                      Día extra completo
-                    </div>
+                    <div className="text-xs font-semibold text-amber-300">Día extra completo</div>
                     <p className="text-[11px] text-slate-400 leading-snug">
-                      No se resta jornada normal. Las horas van enteras como extra
-                      (pago fijo por día, ej. 40k).
+                      Valor fijo por día (no se multiplica por hora). Las horas no son
+                      “horas extraordinarias” de un turno normal.
                     </p>
                   </div>
                 </div>
-                <label
-                  htmlFor="hours-worked"
-                  className="block text-xs font-semibold text-slate-300 mb-2"
-                >
+                <label htmlFor="hours-worked" className="block text-xs font-semibold text-slate-300 mb-2">
                   Horas del turno extra
-                  <span className="ml-1.5 font-normal text-slate-500">
-                    (sugerido: {normalHours} h)
-                  </span>
+                  <span className="ml-1.5 font-normal text-slate-500">(sugerido: {normalHours} h)</span>
                 </label>
               </>
             ) : (
-              <label
-                htmlFor="hours-worked"
-                className="block text-xs font-semibold text-slate-300 mb-2"
-              >
+              <label htmlFor="hours-worked" className="block text-xs font-semibold text-slate-300 mb-2">
                 Horas trabajadas
                 <span className="ml-1.5 font-normal text-slate-500">
-                  (jornada: {normalHours} h · lo que pase de eso = extra)
+                  (jornada: {normalHours} h · exceso = horas extraordinarias)
                 </span>
               </label>
             )}
@@ -274,45 +268,59 @@ export function DayEditor({
               <span className="text-xs text-slate-400">horas</span>
             </div>
             {!hoursValid && (
-              <p className="mt-1.5 text-[11px] text-rose-400">
-                Ingresa un valor entre 0 y 24
-              </p>
+              <p className="mt-1.5 text-[11px] text-rose-400">Ingresa un valor entre 0 y 24</p>
             )}
             {breakdown && selectedType === 'WORK' && (
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-slate-900/80 border border-slate-800 py-1.5 px-1">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                    Total
-                  </div>
-                  <div className="text-sm font-mono font-bold text-slate-200">
-                    {breakdown.worked} h
-                  </div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Total</div>
+                  <div className="text-sm font-mono font-bold text-slate-200">{breakdown.worked} h</div>
                 </div>
                 <div className="rounded-lg bg-slate-900/80 border border-slate-800 py-1.5 px-1">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                    Normal
-                  </div>
-                  <div className="text-sm font-mono font-bold text-sky-300">
-                    {breakdown.normal} h
-                  </div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Normal</div>
+                  <div className="text-sm font-mono font-bold text-sky-300">{breakdown.normal} h</div>
                 </div>
                 <div className="rounded-lg bg-slate-900/80 border border-slate-800 py-1.5 px-1">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                    Sobre jornada
-                  </div>
-                  <div className="text-sm font-mono font-bold text-amber-300">
-                    {breakdown.overtime} h
-                  </div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Extr. hrs</div>
+                  <div className="text-sm font-mono font-bold text-amber-300">{breakdown.overtimeHours} h</div>
                 </div>
               </div>
             )}
             {breakdown && selectedType === 'EXTRA' && (
               <div className="mt-3 rounded-lg bg-amber-950/40 border border-amber-800/50 py-2 px-3 text-center">
                 <div className="text-[10px] uppercase tracking-wider text-amber-400/80">
-                  Día extra · {breakdown.worked} h
+                  Turno extra · {breakdown.extraShiftHours} h
                 </div>
-                <div className="text-sm font-semibold text-amber-200 mt-0.5">
-                  1 día extra (sin jornada normal)
+                <div className="text-sm font-semibold text-amber-200 mt-0.5">1 día extra (valor fijo)</div>
+              </div>
+            )}
+
+            {selectedType === 'EXTRA' && (
+              <div className="mt-3 pt-3 border-t border-slate-800">
+                <div className="text-xs font-semibold text-slate-300 mb-2">Estado de pago</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaid(false)}
+                    className={`py-2.5 rounded-lg border text-xs font-medium transition ${
+                      !paid
+                        ? 'border-amber-500 bg-amber-950/40 text-amber-200'
+                        : 'border-slate-700 bg-slate-900 text-slate-400'
+                    }`}
+                  >
+                    ☐ Pendiente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaid(true)}
+                    className={`py-2.5 rounded-lg border text-xs font-medium transition ${
+                      paid
+                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-200'
+                        : 'border-slate-700 bg-slate-900 text-slate-400'
+                    }`}
+                  >
+                    ✓ Pagado
+                  </button>
                 </div>
               </div>
             )}
@@ -333,7 +341,7 @@ export function DayEditor({
             disabled={!hoursValid}
             className="py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:pointer-events-none text-white font-semibold text-sm shadow-lg shadow-sky-900/30 active:scale-[0.98] transition flex items-center justify-center gap-2"
           >
-            <i className="fa-solid fa-check" /> Guardar Turno
+            <i className="fa-solid fa-check" /> Guardar
           </button>
         </div>
       </div>

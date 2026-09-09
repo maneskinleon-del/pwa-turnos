@@ -1,21 +1,33 @@
 export type ShiftType = 'WORK' | 'REST' | 'EXTRA' | 'OFF';
 
+export type HolidayType = 'NONE' | 'HOLIDAY' | 'IRRENUNCIABLE';
+
 export interface ShiftDay {
   date: string; // YYYY-MM-DD
   type: ShiftType;
   /** Horas realmente trabajadas ese día (opcional). */
   hoursWorked?: number;
+  /**
+   * Solo aplica a EXTRA.
+   * true = pagado, false/undefined = pendiente (compatibilidad con datos antiguos).
+   */
+  paid?: boolean;
 }
 
-/** Configuración de jornada (Fase 3). Independiente de HolidayType. */
+/** Configuración de jornada y liquidación. */
 export interface WorkdayConfig {
   /** Horas de un turno normal (ej. 12 en régimen 4x4). */
   normalHours: number;
+  /** Valor fijo de un turno EXTRA completo (CLP). */
+  extraShiftValue: number;
+  /** Días liquidados del mes (independiente de días físicos trabajados). */
+  liquidationDays: number;
 }
 
-/** Default alineado a turnos 4x4 de 12 h. */
 export const DEFAULT_WORKDAY_CONFIG: WorkdayConfig = {
   normalHours: 12,
+  extraShiftValue: 40_000,
+  liquidationDays: 30,
 };
 
 export const SHIFT_TYPES: { value: ShiftType; label: string; icon: string }[] = [
@@ -30,38 +42,71 @@ export function getShiftTypeInfo(type: ShiftType) {
 }
 
 /**
- * Cálculo derivado de horas (no se persiste el resultado).
+ * Cálculo derivado de horas (no se persiste).
  *
- * WORK:  hoursWorked se parte en normal / overtime según la jornada.
- * EXTRA: el día completo es extra (pago por día). No se resta jornada normal.
- * REST/OFF: sin horas.
+ * - WORK: parte hoursWorked en normalHours + overtimeHours (sobre jornada).
+ * - EXTRA: hoursWorked → extraShiftHours (NO son overtimeHours).
+ * - REST/OFF: cero.
+ *
+ * overtimeHours y turnos EXTRA son conceptos distintos.
  */
 export function computeHours(
   hoursWorked: number | undefined,
   normalHours: number = DEFAULT_WORKDAY_CONFIG.normalHours,
   shiftType: ShiftType = 'WORK'
-): { worked: number; normal: number; overtime: number; isExtraDay: boolean } {
+): {
+  worked: number;
+  /** Horas de jornada normal (solo WORK). */
+  normal: number;
+  /**
+   * Horas sobre la jornada en un turno WORK.
+   * Nunca se usa para días EXTRA.
+   */
+  overtimeHours: number;
+  /**
+   * Horas trabajadas en un turno EXTRA (día completo extra).
+   * Independiente de overtimeHours.
+   */
+  extraShiftHours: number;
+  isExtraDay: boolean;
+  /** @deprecated usar overtimeHours — alias de compatibilidad */
+  overtime: number;
+} {
   const worked =
     typeof hoursWorked === 'number' && hoursWorked > 0 ? hoursWorked : 0;
 
   if (shiftType === 'EXTRA') {
-    // Día extra laboral completo: todo cuenta como extra, 0 normales.
     return {
       worked,
       normal: 0,
-      overtime: worked,
+      overtimeHours: 0,
+      extraShiftHours: worked,
       isExtraDay: true,
+      overtime: 0,
     };
   }
 
   if (shiftType === 'REST' || shiftType === 'OFF') {
-    return { worked: 0, normal: 0, overtime: 0, isExtraDay: false };
+    return {
+      worked: 0,
+      normal: 0,
+      overtimeHours: 0,
+      extraShiftHours: 0,
+      isExtraDay: false,
+      overtime: 0,
+    };
   }
 
-  // WORK
   const normal = Math.min(worked, normalHours);
-  const overtime = Math.max(0, worked - normalHours);
-  return { worked, normal, overtime, isExtraDay: false };
+  const overtimeHours = Math.max(0, worked - normalHours);
+  return {
+    worked,
+    normal,
+    overtimeHours,
+    extraShiftHours: 0,
+    isExtraDay: false,
+    overtime: overtimeHours,
+  };
 }
 
 export function formatDateKey(date: Date): string {
@@ -90,7 +135,7 @@ export function getDaysInMonth(year: number, month: number): number {
 }
 
 export function getFirstDayOfMonth(year: number, month: number): number {
-  return new Date(year, month, 1).getDay(); // 0 = Sunday
+  return new Date(year, month, 1).getDay();
 }
 
 export function getMonthName(month: number): string {
@@ -109,4 +154,12 @@ export function getMonthName(month: number): string {
     'Diciembre',
   ];
   return months[month];
+}
+
+export function formatCLP(amount: number): string {
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }

@@ -8,15 +8,27 @@ import {
   getMonthName,
 } from '@/types/shift';
 import { DayEditor } from './DayEditor';
+import { getHoliday } from '@/data/chileHolidays';
+import { MonthlySummaryPanel } from './MonthlySummary';
+import { buildMonthlySummary } from '@/domain/monthlySummary';
+import type { WorkdayConfig } from '@/types/shift';
+import { DEFAULT_WORKDAY_CONFIG } from '@/types/shift';
 
 interface CalendarProps {
   selectedDate: string | null;
   onSelectDate: (dateKey: string) => void;
   getShiftType: (dateKey: string) => ShiftType;
   getHoursWorked?: (dateKey: string) => number | undefined;
+  getPaid?: (dateKey: string) => boolean;
   normalHours?: number;
-  monthHoursSummary?: { worked: number; normal: number; overtime: number; daysWithHours: number };
-  onUpdateShift: (dateKey: string, type: ShiftType, hoursWorked?: number) => void;
+  config?: WorkdayConfig;
+  shifts?: import('@/types/shift').ShiftDay[];
+  onUpdateShift: (
+    dateKey: string,
+    type: ShiftType,
+    hoursWorked?: number,
+    paid?: boolean
+  ) => void;
 }
 
 export interface CalendarHandle {
@@ -57,8 +69,10 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
     onSelectDate,
     getShiftType,
     getHoursWorked,
+    getPaid,
     normalHours = 12,
-    monthHoursSummary,
+    config = DEFAULT_WORKDAY_CONFIG,
+    shifts = [],
     onUpdateShift,
   },
   ref
@@ -66,6 +80,7 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
   const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
   const [editorDate, setEditorDate] = useState<string | null>(null);
+  const [showSummary, setShowSummary] = useState(true);
 
   const daysInMonth = useMemo(
     () => getDaysInMonth(currentYear, currentMonth),
@@ -140,53 +155,37 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
   }, [currentYear, currentMonth, daysInMonth, getShiftType]);
 
   const hoursSummary = useMemo(() => {
-    if (monthHoursSummary) return monthHoursSummary;
     let worked = 0;
     let normalAcc = 0;
-    let overtimeAcc = 0;
+    let overtimeHrs = 0;
+    let extraShiftHrs = 0;
     let daysWithHours = 0;
-    let extraDays = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const key = formatDateKey(new Date(currentYear, currentMonth, d));
       const type = getShiftType(key);
       const h = getHoursWorked?.(key);
       if (type === 'EXTRA') {
-        extraDays += 1;
-        if (typeof h === 'number' && h > 0) {
-          worked += h;
-          overtimeAcc += h; // día extra completo
-          daysWithHours += 1;
-        } else {
-          // sin horas cargadas: igual cuenta el día extra
-          overtimeAcc += normalHours;
-          worked += normalHours;
-          daysWithHours += 1;
-        }
+        const hrs = typeof h === 'number' && h > 0 ? h : normalHours;
+        worked += hrs;
+        extraShiftHrs += hrs;
+        daysWithHours += 1;
         continue;
       }
       if (typeof h === 'number' && h > 0) {
         worked += h;
         normalAcc += Math.min(h, normalHours);
-        overtimeAcc += Math.max(0, h - normalHours);
+        overtimeHrs += Math.max(0, h - normalHours);
         daysWithHours += 1;
       }
     }
     return {
       worked,
       normal: normalAcc,
-      overtime: overtimeAcc,
+      overtime: overtimeHrs,
+      extraShift: extraShiftHrs,
       daysWithHours,
-      extraDays,
     };
-  }, [
-    currentYear,
-    currentMonth,
-    daysInMonth,
-    getHoursWorked,
-    getShiftType,
-    normalHours,
-    monthHoursSummary,
-  ]);
+  }, [currentYear, currentMonth, daysInMonth, getHoursWorked, getShiftType, normalHours]);
 
   const handleDayClick = (date: Date) => {
     const key = formatDateKey(date);
@@ -202,6 +201,8 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
       date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     const isTodayFlag = isToday(date);
     const badge = SHIFT_BADGE[type];
+    const holiday = getHoliday(key);
+    const paid = type === 'EXTRA' ? getPaid?.(key) === true : false;
 
     let base =
       'calendar-cell flex flex-col justify-between p-1.5 rounded-xl border cursor-pointer ';
@@ -236,7 +237,19 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
           >
             {date.getDate()}
           </span>
-          {isTodayFlag && <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
+          <div className="flex items-center gap-0.5">
+            {holiday && (
+              <span
+                className={`text-[9px] ${
+                  holiday.type === 'IRRENUNCIABLE' ? 'text-rose-400' : 'text-violet-400'
+                }`}
+                title={holiday.name}
+              >
+                {holiday.type === 'IRRENUNCIABLE' ? '⚠' : '★'}
+              </span>
+            )}
+            {isTodayFlag && <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
+          </div>
         </div>
         {badge ? (
           <div className="mt-auto space-y-0.5">
@@ -267,8 +280,17 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
               }
               if (type === 'EXTRA') {
                 return (
-                  <div className="text-center text-[8px] font-mono font-semibold text-amber-400 leading-none">
-                    {hours}h
+                  <div className="text-center leading-tight">
+                    <div className="text-[8px] font-mono font-semibold text-amber-400">
+                      {hours}h
+                    </div>
+                    <div
+                      className={`text-[8px] font-bold ${
+                        paid ? 'text-emerald-400' : 'text-slate-500'
+                      }`}
+                    >
+                      {paid ? '✓' : '□'}
+                    </div>
                   </div>
                 );
               }
@@ -303,6 +325,13 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
             <span id="current-month-year" className="text-xs text-slate-400">
               Mes seleccionado
             </span>
+            <button
+              type="button"
+              onClick={() => setShowSummary(s => !s)}
+              className="mt-1 text-[10px] text-sky-400 hover:text-sky-300"
+            >
+              {showSummary ? 'Ocultar resumen' : 'Ver resumen'}
+            </button>
           </div>
           <div className="flex items-center space-x-1">
             <button
@@ -374,7 +403,8 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
                 <span className="text-slate-500">Σ</span> {hoursSummary.worked}h
               </span>
               <span className="text-sky-300">{hoursSummary.normal}h n</span>
-              <span className="text-amber-300">{hoursSummary.overtime}h x</span>
+              <span className="text-amber-300">{hoursSummary.overtime}h oe</span>
+              <span className="text-amber-200/80">{hoursSummary.extraShift}h ex</span>
             </div>
           </div>
         )}
@@ -407,13 +437,20 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
       </main>
 
       {/* Day Editor Modal */}
+      {showSummary && (
+        <MonthlySummaryPanel
+          summary={buildMonthlySummary(shifts, currentYear, currentMonth, config)}
+        />
+      )}
+
       {editorDate && (
         <DayEditor
           dateKey={editorDate}
           currentType={getShiftType(editorDate)}
           currentHours={getHoursWorked?.(editorDate)}
+          currentPaid={getPaid?.(editorDate) === true}
           normalHours={normalHours}
-          onSave={(type, hours) => onUpdateShift(editorDate, type, hours)}
+          onSave={(type, hours, paid) => onUpdateShift(editorDate, type, hours, paid)}
           onClose={() => setEditorDate(null)}
         />
       )}

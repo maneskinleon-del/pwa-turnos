@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ShiftDay, ShiftType, WorkdayConfig } from '@/types/shift';
-import { DEFAULT_WORKDAY_CONFIG, computeHours } from '@/types/shift';
+import { DEFAULT_WORKDAY_CONFIG } from '@/types/shift';
 import { loadShifts, saveShifts, seedDemoData } from '@/storage/shifts';
 import { loadConfig, saveConfig } from '@/storage/config';
+import { buildMonthlySummary } from '@/domain/monthlySummary';
 
 export function useShifts() {
   const [shifts, setShiftsState] = useState<ShiftDay[]>([]);
@@ -22,7 +23,7 @@ export function useShifts() {
   }, []);
 
   const updateShift = useCallback(
-    (dateKey: string, type: ShiftType, hoursWorked?: number) => {
+    (dateKey: string, type: ShiftType, hoursWorked?: number, paid?: boolean) => {
       setShiftsState(prev => {
         const existingIndex = prev.findIndex(s => s.date === dateKey);
         let next: ShiftDay[];
@@ -34,6 +35,9 @@ export function useShifts() {
           if (typeof hoursWorked === 'number' && hoursWorked > 0) {
             newShift.hoursWorked = hoursWorked;
           }
+          if (type === 'EXTRA') {
+            newShift.paid = paid === true;
+          }
           if (existingIndex >= 0) {
             next = [...prev];
             next[existingIndex] = newShift;
@@ -41,7 +45,6 @@ export function useShifts() {
             next = [...prev, newShift];
           }
         }
-
         saveShifts(next);
         return next;
       });
@@ -51,16 +54,13 @@ export function useShifts() {
 
   const getShiftType = useCallback(
     (dateKey: string): ShiftType => {
-      const shift = shifts.find(s => s.date === dateKey);
-      return shift?.type ?? 'OFF';
+      return shifts.find(s => s.date === dateKey)?.type ?? 'OFF';
     },
     [shifts]
   );
 
   const getShift = useCallback(
-    (dateKey: string): ShiftDay | undefined => {
-      return shifts.find(s => s.date === dateKey);
-    },
+    (dateKey: string): ShiftDay | undefined => shifts.find(s => s.date === dateKey),
     [shifts]
   );
 
@@ -72,30 +72,9 @@ export function useShifts() {
     });
   }, []);
 
-  /** Resumen de horas del mes (solo días del mes indicado). */
-  const getMonthHoursSummary = useCallback(
-    (year: number, month: number) => {
-      const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
-      let worked = 0;
-      let normal = 0;
-      let overtime = 0;
-      let daysWithHours = 0;
-
-      for (const s of shifts) {
-        if (!s.date.startsWith(prefix)) continue;
-        const h = computeHours(s.hoursWorked, config.normalHours, s.type);
-        if (h.worked <= 0 && s.type !== 'EXTRA') continue;
-        worked += h.worked || (s.type === 'EXTRA' ? config.normalHours : 0);
-        normal += h.normal;
-        overtime +=
-          h.overtime ||
-          (s.type === 'EXTRA' && h.worked <= 0 ? config.normalHours : 0);
-        daysWithHours += 1;
-      }
-
-      return { worked, normal, overtime, daysWithHours };
-    },
-    [shifts, config.normalHours]
+  const getMonthSummary = useCallback(
+    (year: number, month: number) => buildMonthlySummary(shifts, year, month, config),
+    [shifts, config]
   );
 
   return {
@@ -106,7 +85,7 @@ export function useShifts() {
     getShiftType,
     getShift,
     updateConfig,
-    getMonthHoursSummary,
+    getMonthSummary,
     reload,
   };
 }
