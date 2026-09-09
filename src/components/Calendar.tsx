@@ -88,16 +88,6 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
   const [internalYear, setInternalYear] = useState(() => new Date().getFullYear());
   const currentMonth = viewMonth ?? internalMonth;
   const currentYear = viewYear ?? internalYear;
-  const setCurrentMonth = (m: number | ((prev: number) => number)) => {
-    const next = typeof m === 'function' ? m(currentMonth) : m;
-    if (onViewMonthChange) onViewMonthChange(currentYear, next);
-    else setInternalMonth(next);
-  };
-  const setCurrentYear = (y: number | ((prev: number) => number)) => {
-    const next = typeof y === 'function' ? y(currentYear) : y;
-    if (onViewMonthChange) onViewMonthChange(next, currentMonth);
-    else setInternalYear(next);
-  };
   const [editorDate, setEditorDate] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(true);
 
