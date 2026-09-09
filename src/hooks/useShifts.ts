@@ -6,6 +6,11 @@ export function useShifts() {
   const [shifts, setShiftsState] = useState<ShiftDay[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  const reload = useCallback(() => {
+    const data = loadShifts();
+    setShiftsState(data);
+  }, []);
+
   useEffect(() => {
     seedDemoData();
     const data = loadShifts();
@@ -18,7 +23,7 @@ export function useShifts() {
       const existingIndex = prev.findIndex(s => s.date === dateKey);
       const newShift: ShiftDay = { date: dateKey, type };
       let next: ShiftDay[];
-      
+
       if (existingIndex >= 0) {
         if (type === 'OFF') {
           next = prev.filter(s => s.date !== dateKey);
@@ -31,16 +36,19 @@ export function useShifts() {
       } else {
         next = prev;
       }
-      
+
       saveShifts(next);
       return next;
     });
   }, []);
 
-  const getShiftType = useCallback((dateKey: string): ShiftType => {
-    const shift = shifts.find(s => s.date === dateKey);
-    return shift?.type ?? 'OFF';
-  }, [shifts]);
+  const getShiftType = useCallback(
+    (dateKey: string): ShiftType => {
+      const shift = shifts.find(s => s.date === dateKey);
+      return shift?.type ?? 'OFF';
+    },
+    [shifts]
+  );
 
-  return { shifts, loaded, updateShift, getShiftType };
+  return { shifts, loaded, updateShift, getShiftType, reload };
 }

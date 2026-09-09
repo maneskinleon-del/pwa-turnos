@@ -26,12 +26,12 @@ describe('DayEditor', () => {
 
   it('shows the formatted date as heading', () => {
     renderEditor({ dateKey: '2026-09-01' });
-    expect(screen.getByRole('heading', { name: /1 de septiembre/ })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /1 de Septiembre/i })).toBeTruthy();
   });
 
   it('saves the currently selected type without changes', () => {
     const { onSave, onClose } = renderEditor({ currentType: 'EXTRA' });
-    fireEvent.click(screen.getByText('Guardar'));
+    fireEvent.click(screen.getByText(/Guardar/));
     expect(onSave).toHaveBeenCalledWith('EXTRA');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -39,7 +39,7 @@ describe('DayEditor', () => {
   it('saves a newly selected shift type', () => {
     const { onSave } = renderEditor();
     fireEvent.click(screen.getByText('Descanso'));
-    fireEvent.click(screen.getByText('Guardar'));
+    fireEvent.click(screen.getByText(/Guardar/));
     expect(onSave).toHaveBeenCalledWith('REST');
   });
 

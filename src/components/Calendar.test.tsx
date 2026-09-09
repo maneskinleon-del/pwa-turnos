@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Calendar } from '@/components/Calendar';
+import { createRef } from 'react';
+import { Calendar, type CalendarHandle } from '@/components/Calendar';
 import { getMonthName } from '@/types/shift';
 import type { ShiftType } from '@/types/shift';
 
@@ -34,7 +35,8 @@ function monthLabel(offset: number): string {
 }
 
 function getDayButtons(): HTMLElement[] {
-  return screen.getAllByRole('button').filter(b => b.querySelector('span[aria-label]'));
+  // Day cells have data-date attribute
+  return screen.getAllByRole('button').filter(b => b.hasAttribute('data-date'));
 }
 
 describe('Calendar', () => {
@@ -76,11 +78,19 @@ describe('Calendar', () => {
     vi.useRealTimers();
   });
 
-  it('returns to the current month when clicking Hoy', () => {
-    renderCalendar();
+  it('returns to the current month via imperative goToToday handle', () => {
+    const ref = createRef<CalendarHandle>();
+    const props = {
+      selectedDate: null as string | null,
+      onSelectDate: vi.fn(),
+      getShiftType: () => 'OFF' as ShiftType,
+      onUpdateShift: vi.fn(),
+    };
+    render(<Calendar ref={ref} {...props} />);
     fireEvent.click(screen.getByLabelText('Mes siguiente'));
     fireEvent.click(screen.getByLabelText('Mes siguiente'));
-    fireEvent.click(screen.getByText('Hoy'));
+    expect(screen.getByRole('heading', { name: monthLabel(2) })).toBeTruthy();
+    ref.current?.goToToday();
     expect(screen.getByRole('heading', { name: monthLabel(0) })).toBeTruthy();
   });
 
@@ -90,7 +100,7 @@ describe('Calendar', () => {
     const dayButtons = getDayButtons();
     expect(dayButtons.length).toBeGreaterThan(0);
     fireEvent.click(dayButtons[0]);
-    expect(screen.getByText('Guardar')).toBeTruthy();
+    expect(screen.getByText(/Guardar/)).toBeTruthy();
     expect(screen.getByText('Trabajo')).toBeTruthy();
     expect(onSelectDate).toHaveBeenCalledTimes(1);
   });
@@ -100,16 +110,17 @@ describe('Calendar', () => {
     renderCalendar({ onUpdateShift });
     fireEvent.click(getDayButtons()[0]);
     fireEvent.click(screen.getByText('Descanso'));
-    fireEvent.click(screen.getByText('Guardar'));
+    fireEvent.click(screen.getByText(/Guardar/));
     expect(onUpdateShift).toHaveBeenCalledTimes(1);
     expect(onUpdateShift.mock.calls[0][0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(onUpdateShift.mock.calls[0][1]).toBe('REST');
   });
 
-  it('renders the shift icon for a day with a stored shift', () => {
+  it('renders the shift badge for a day with a stored shift', () => {
     renderCalendar({ getShiftType: key => (key.endsWith('-15') ? 'WORK' : 'OFF') });
-    const workButtons = screen.getAllByRole('button').filter(b => b.textContent?.includes('💼'));
-    expect(workButtons.length).toBeGreaterThan(0);
+    // Badge shows short label "W" for WORK
+    const workBadges = screen.getAllByText('W');
+    expect(workBadges.length).toBeGreaterThan(0);
   });
 
   it('closes the editor without saving', () => {
@@ -117,7 +128,7 @@ describe('Calendar', () => {
     renderCalendar({ onUpdateShift });
     fireEvent.click(getDayButtons()[0]);
     fireEvent.click(screen.getByLabelText('Cerrar'));
-    expect(screen.queryByText('Guardar')).toBeNull();
+    expect(screen.queryByText(/Guardar/)).toBeNull();
     expect(onUpdateShift).not.toHaveBeenCalled();
   });
 });

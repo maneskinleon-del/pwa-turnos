@@ -45,3 +45,12 @@ Primera versión estable del calendario de turnos. Checkpoint publicado y verifi
 
 - Verificación visual manual (sin Chrome/Chromium disponible en el dispositivo
   de desarrollo; cubierto por tests de componentes).
+## [1.0.1] — 2026-09-08
+
+### UI / visual polish
+
+- Celdas del calendario con relieve 3D: sombra profunda, degradado vertical y borde superior iluminado (efecto “flotante”).
+- Hover con elevación sutil; celdas de meses adyacentes más planas; día actual con glow sky.
+- Botón de fecha actual en el header muestra el día formateado (ej. «8 de septiembre») en lugar de solo «Hoy».
+- Layout del header alineado al diseño de referencia (fecha + demo wand).
+
