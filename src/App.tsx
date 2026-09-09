@@ -109,7 +109,7 @@ function App() {
           shifts={shifts}
           onUpdateShift={(dateKey, type, hours, paid) => {
             updateShift(dateKey, type, hours, paid);
-            const bits = [type];
+            const bits: string[] = [type];
             if (typeof hours === 'number' && hours > 0) bits.push(`${hours}h`);
             if (type === 'EXTRA') bits.push(paid ? 'pagado' : 'pendiente');
             showToast(`Día: ${bits.join(' · ')}`);
