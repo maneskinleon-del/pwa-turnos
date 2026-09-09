@@ -1,8 +1,12 @@
 import { useState, useRef, useMemo } from 'react';
 import { Calendar, type CalendarHandle } from '@/components/Calendar';
+import { ResumenView } from '@/components/ResumenView';
 import { useShifts } from '@/hooks/useShifts';
 import { clearAllShifts, seedDemoDataForced } from '@/storage/shifts';
 import { getMonthName } from '@/types/shift';
+import { buildMonthlySummary } from '@/domain/monthlySummary';
+
+type Tab = 'calendario' | 'resumen';
 
 function formatTodayLabel(): string {
   const now = new Date();
@@ -21,8 +25,16 @@ function App() {
   } = useShifts();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>('calendario');
+  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const calendarRef = useRef<CalendarHandle>(null);
   const todayLabel = useMemo(() => formatTodayLabel(), []);
+
+  const summary = useMemo(
+    () => buildMonthlySummary(shifts, viewYear, viewMonth, config),
+    [shifts, viewYear, viewMonth, config]
+  );
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -44,8 +56,34 @@ function App() {
   };
 
   const handleGoToday = () => {
+    const now = new Date();
+    setViewYear(now.getFullYear());
+    setViewMonth(now.getMonth());
     calendarRef.current?.goToToday();
     showToast('Mes actual restaurado');
+  };
+
+  const handleViewMonthChange = (year: number, month: number) => {
+    setViewYear(year);
+    setViewMonth(month);
+  };
+
+  const prevMonth = () => {
+    if (viewMonth === 0) {
+      setViewYear(y => y - 1);
+      setViewMonth(11);
+    } else {
+      setViewMonth(m => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (viewMonth === 11) {
+      setViewYear(y => y + 1);
+      setViewMonth(0);
+    } else {
+      setViewMonth(m => m + 1);
+    }
   };
 
   if (!loaded) {
@@ -59,6 +97,7 @@ function App() {
   return (
     <div className="h-full flex flex-col items-center bg-slate-950 font-sans antialiased selection:bg-sky-500 selection:text-white">
       <div className="w-full max-w-md h-full min-h-screen bg-slate-900 border-x border-slate-800/80 flex flex-col relative shadow-2xl overflow-x-hidden">
+        {/* Top App Bar */}
         <header className="sticky top-0 z-20 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-lg border border-sky-500/30">
@@ -97,24 +136,66 @@ function App() {
           </div>
         </header>
 
-        <Calendar
-          ref={calendarRef}
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          getShiftType={getShiftType}
-          getHoursWorked={dateKey => getShift(dateKey)?.hoursWorked}
-          getPaid={dateKey => getShift(dateKey)?.paid === true}
-          normalHours={config.normalHours}
-          config={config}
-          shifts={shifts}
-          onUpdateShift={(dateKey, type, hours, paid) => {
-            updateShift(dateKey, type, hours, paid);
-            const bits: string[] = [type];
-            if (typeof hours === 'number' && hours > 0) bits.push(`${hours}h`);
-            if (type === 'EXTRA') bits.push(paid ? 'pagado' : 'pendiente');
-            showToast(`Día: ${bits.join(' · ')}`);
-          }}
-        />
+        {/* Tabs: CALENDARIO | RESUMEN */}
+        <nav className="px-3 pt-2 pb-1 bg-slate-900 border-b border-slate-800/80">
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/80 border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setTab('calendario')}
+              className={`py-2 rounded-lg text-xs font-semibold tracking-wide transition flex items-center justify-center gap-1.5 ${
+                tab === 'calendario'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-900/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <i className="fa-solid fa-calendar-days text-[10px]" />
+              Calendario
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('resumen')}
+              className={`py-2 rounded-lg text-xs font-semibold tracking-wide transition flex items-center justify-center gap-1.5 ${
+                tab === 'resumen'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-900/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <i className="fa-solid fa-chart-simple text-[10px]" />
+              Resumen
+            </button>
+          </div>
+        </nav>
+
+        {tab === 'calendario' ? (
+          <Calendar
+            ref={calendarRef}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            getShiftType={getShiftType}
+            getHoursWorked={dateKey => getShift(dateKey)?.hoursWorked}
+            getPaid={dateKey => getShift(dateKey)?.paid === true}
+            normalHours={config.normalHours}
+            config={config}
+            shifts={shifts}
+            viewMonth={viewMonth}
+            viewYear={viewYear}
+            onViewMonthChange={handleViewMonthChange}
+            onUpdateShift={(dateKey, type, hours, paid) => {
+              updateShift(dateKey, type, hours, paid);
+              const bits: string[] = [type];
+              if (typeof hours === 'number' && hours > 0) bits.push(`${hours}h`);
+              if (type === 'EXTRA') bits.push(paid ? 'pagado' : 'pendiente');
+              showToast(`Día: ${bits.join(' · ')}`);
+            }}
+          />
+        ) : (
+          <ResumenView
+            summary={summary}
+            onPrevMonth={prevMonth}
+            onNextMonth={nextMonth}
+            onGoToday={handleGoToday}
+          />
+        )}
 
         <footer className="p-3 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-1.5">

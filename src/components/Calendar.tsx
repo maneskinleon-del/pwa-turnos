@@ -23,6 +23,10 @@ interface CalendarProps {
   normalHours?: number;
   config?: WorkdayConfig;
   shifts?: import('@/types/shift').ShiftDay[];
+  /** Mes controlado desde App (0-index). Si se pasa, Calendar es controlado. */
+  viewMonth?: number;
+  viewYear?: number;
+  onViewMonthChange?: (year: number, month: number) => void;
   onUpdateShift: (
     dateKey: string,
     type: ShiftType,
@@ -73,12 +77,27 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
     normalHours = 12,
     config = DEFAULT_WORKDAY_CONFIG,
     shifts = [],
+    viewMonth,
+    viewYear,
+    onViewMonthChange,
     onUpdateShift,
   },
   ref
 ) {
-  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [internalMonth, setInternalMonth] = useState(() => new Date().getMonth());
+  const [internalYear, setInternalYear] = useState(() => new Date().getFullYear());
+  const currentMonth = viewMonth ?? internalMonth;
+  const currentYear = viewYear ?? internalYear;
+  const setCurrentMonth = (m: number | ((prev: number) => number)) => {
+    const next = typeof m === 'function' ? m(currentMonth) : m;
+    if (onViewMonthChange) onViewMonthChange(currentYear, next);
+    else setInternalMonth(next);
+  };
+  const setCurrentYear = (y: number | ((prev: number) => number)) => {
+    const next = typeof y === 'function' ? y(currentYear) : y;
+    if (onViewMonthChange) onViewMonthChange(next, currentMonth);
+    else setInternalYear(next);
+  };
   const [editorDate, setEditorDate] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(true);
 
@@ -93,26 +112,37 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
 
   const prevMonth = () => {
     if (currentMonth === 0) {
-      setCurrentYear(y => y - 1);
-      setCurrentMonth(11);
+      if (onViewMonthChange) onViewMonthChange(currentYear - 1, 11);
+      else {
+        setInternalYear(y => y - 1);
+        setInternalMonth(11);
+      }
     } else {
-      setCurrentMonth(m => m - 1);
+      if (onViewMonthChange) onViewMonthChange(currentYear, currentMonth - 1);
+      else setInternalMonth(m => m - 1);
     }
   };
 
   const nextMonth = () => {
     if (currentMonth === 11) {
-      setCurrentYear(y => y + 1);
-      setCurrentMonth(0);
+      if (onViewMonthChange) onViewMonthChange(currentYear + 1, 0);
+      else {
+        setInternalYear(y => y + 1);
+        setInternalMonth(0);
+      }
     } else {
-      setCurrentMonth(m => m + 1);
+      if (onViewMonthChange) onViewMonthChange(currentYear, currentMonth + 1);
+      else setInternalMonth(m => m + 1);
     }
   };
 
   const goToToday = () => {
     const now = new Date();
-    setCurrentMonth(now.getMonth());
-    setCurrentYear(now.getFullYear());
+    if (onViewMonthChange) onViewMonthChange(now.getFullYear(), now.getMonth());
+    else {
+      setInternalMonth(now.getMonth());
+      setInternalYear(now.getFullYear());
+    }
   };
 
   useImperativeHandle(ref, () => ({ goToToday }), []);
