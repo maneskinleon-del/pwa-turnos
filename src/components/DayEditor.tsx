@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { ShiftType } from '@/types/shift';
-import { getMonthName } from '@/types/shift';
+import { getMonthName, computeHours, DEFAULT_WORKDAY_CONFIG } from '@/types/shift';
 
 interface DayEditorProps {
   dateKey: string;
   currentType: ShiftType;
-  onSave: (type: ShiftType) => void;
+  currentHours?: number;
+  normalHours?: number;
+  onSave: (type: ShiftType, hoursWorked?: number) => void;
   onClose: () => void;
 }
 
@@ -26,7 +28,6 @@ const OPTIONS: {
   icon: string;
   iconBg: string;
   badge: string;
-  radio: string;
 }[] = [
   {
     type: 'WORK',
@@ -35,7 +36,6 @@ const OPTIONS: {
     icon: 'fa-briefcase',
     iconBg: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
     badge: 'bg-sky-950 text-sky-300 border-sky-800',
-    radio: 'text-sky-500',
   },
   {
     type: 'REST',
@@ -44,7 +44,6 @@ const OPTIONS: {
     icon: 'fa-bed',
     iconBg: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     badge: 'bg-emerald-950 text-emerald-300 border-emerald-800',
-    radio: 'text-emerald-500',
   },
   {
     type: 'EXTRA',
@@ -53,7 +52,6 @@ const OPTIONS: {
     icon: 'fa-bolt',
     iconBg: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     badge: 'bg-amber-950 text-amber-300 border-amber-800',
-    radio: 'text-amber-500',
   },
   {
     type: 'OFF',
@@ -62,12 +60,21 @@ const OPTIONS: {
     icon: 'fa-ban',
     iconBg: 'bg-slate-800 text-slate-400 border-slate-700',
     badge: 'bg-slate-800 text-slate-400 border-slate-700',
-    radio: 'text-slate-400',
   },
 ];
 
-export function DayEditor({ dateKey, currentType, onSave, onClose }: DayEditorProps) {
+export function DayEditor({
+  dateKey,
+  currentType,
+  currentHours,
+  normalHours = DEFAULT_WORKDAY_CONFIG.normalHours,
+  onSave,
+  onClose,
+}: DayEditorProps) {
   const [selectedType, setSelectedType] = useState<ShiftType>(currentType);
+  const [hoursInput, setHoursInput] = useState<string>(
+    currentHours && currentHours > 0 ? String(currentHours) : ''
+  );
   const [visible, setVisible] = useState(false);
 
   const [year, month, day] = dateKey.split('-').map(Number);
@@ -75,8 +82,16 @@ export function DayEditor({ dateKey, currentType, onSave, onClose }: DayEditorPr
   const weekday = WEEKDAY_NAMES[dateObj.getDay()];
   const dateTitle = `${day} de ${getMonthName(month - 1)}, ${year}`;
 
+  const parsedHours = hoursInput === '' ? undefined : Number(hoursInput);
+  const hoursValid =
+    parsedHours === undefined ||
+    (Number.isFinite(parsedHours) && parsedHours >= 0 && parsedHours <= 24);
+  const breakdown =
+    hoursValid && parsedHours !== undefined && parsedHours > 0
+      ? computeHours(parsedHours, normalHours)
+      : null;
+
   useEffect(() => {
-    // Trigger enter animation
     requestAnimationFrame(() => setVisible(true));
   }, []);
 
@@ -89,13 +104,17 @@ export function DayEditor({ dateKey, currentType, onSave, onClose }: DayEditorPr
   }, [onClose]);
 
   const handleSave = () => {
-    onSave(selectedType);
+    if (!hoursValid) return;
+    const hours =
+      parsedHours !== undefined && parsedHours > 0 ? parsedHours : undefined;
+    onSave(selectedType, hours);
     onClose();
   };
 
+  const showHoursField = selectedType === 'WORK' || selectedType === 'EXTRA';
+
   return (
     <>
-      {/* Backdrop */}
       <div
         className={`fixed inset-0 bg-black/60 z-40 backdrop-transition ${
           visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -104,16 +123,14 @@ export function DayEditor({ dateKey, currentType, onSave, onClose }: DayEditorPr
         aria-hidden
       />
 
-      {/* Bottom Sheet */}
       <div
-        className={`fixed bottom-0 inset-x-0 max-w-md mx-auto z-50 bg-slate-900 border-t border-slate-700/80 rounded-t-2xl shadow-2xl p-5 sheet-transition ${
+        className={`fixed bottom-0 inset-x-0 max-w-md mx-auto z-50 bg-slate-900 border-t border-slate-700/80 rounded-t-2xl shadow-2xl p-5 sheet-transition max-h-[90vh] overflow-y-auto ${
           visible ? 'translate-y-0' : 'translate-y-full pointer-events-none'
         }`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-date-title"
       >
-        {/* Drag handle */}
         <div
           className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-4 cursor-pointer"
           onClick={onClose}
@@ -131,7 +148,7 @@ export function DayEditor({ dateKey, currentType, onSave, onClose }: DayEditorPr
               {dateTitle}
             </h3>
             <p className="text-xs text-slate-400">
-              Selecciona el tipo de turno para este día
+              Selecciona el tipo de turno y las horas
             </p>
           </div>
           <button
@@ -144,7 +161,7 @@ export function DayEditor({ dateKey, currentType, onSave, onClose }: DayEditorPr
           </button>
         </div>
 
-        <div className="space-y-2.5 mb-6">
+        <div className="space-y-2.5 mb-4">
           {OPTIONS.map(opt => {
             const selected = selectedType === opt.type;
             return (
@@ -192,7 +209,70 @@ export function DayEditor({ dateKey, currentType, onSave, onClose }: DayEditorPr
           })}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-2">
+        {/* Horas trabajadas (Fase 3) */}
+        {showHoursField && (
+          <div className="mb-5 p-3 rounded-xl border border-slate-800 bg-slate-950/60">
+            <label
+              htmlFor="hours-worked"
+              className="block text-xs font-semibold text-slate-300 mb-2"
+            >
+              Horas trabajadas
+              <span className="ml-1.5 font-normal text-slate-500">
+                (jornada normal: {normalHours} h)
+              </span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="hours-worked"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={24}
+                step={0.5}
+                placeholder="0"
+                value={hoursInput}
+                onChange={e => setHoursInput(e.target.value)}
+                className="w-24 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/40"
+              />
+              <span className="text-xs text-slate-400">horas</span>
+            </div>
+            {!hoursValid && (
+              <p className="mt-1.5 text-[11px] text-rose-400">
+                Ingresa un valor entre 0 y 24
+              </p>
+            )}
+            {breakdown && (
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-slate-900/80 border border-slate-800 py-1.5 px-1">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                    Total
+                  </div>
+                  <div className="text-sm font-mono font-bold text-slate-200">
+                    {breakdown.worked} h
+                  </div>
+                </div>
+                <div className="rounded-lg bg-slate-900/80 border border-slate-800 py-1.5 px-1">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                    Normal
+                  </div>
+                  <div className="text-sm font-mono font-bold text-sky-300">
+                    {breakdown.normal} h
+                  </div>
+                </div>
+                <div className="rounded-lg bg-slate-900/80 border border-slate-800 py-1.5 px-1">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                    Extra
+                  </div>
+                  <div className="text-sm font-mono font-bold text-amber-300">
+                    {breakdown.overtime} h
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 pt-1">
           <button
             type="button"
             onClick={onClose}
@@ -203,7 +283,8 @@ export function DayEditor({ dateKey, currentType, onSave, onClose }: DayEditorPr
           <button
             type="button"
             onClick={handleSave}
-            className="py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm shadow-lg shadow-sky-900/30 active:scale-[0.98] transition flex items-center justify-center gap-2"
+            disabled={!hoursValid}
+            className="py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:pointer-events-none text-white font-semibold text-sm shadow-lg shadow-sky-900/30 active:scale-[0.98] transition flex items-center justify-center gap-2"
           >
             <i className="fa-solid fa-check" /> Guardar Turno
           </button>

@@ -8,7 +8,7 @@ export function loadShifts(): ShiftDay[] {
     if (!data) return [];
     const parsed = JSON.parse(data);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isValidShiftDay);
+    return parsed.filter(isValidShiftDay).map(normalizeShiftDay);
   } catch {
     return [];
   }
@@ -27,18 +27,30 @@ export function getShift(dateKey: string): ShiftDay | undefined {
   return shifts.find(s => s.date === dateKey);
 }
 
-export function setShift(dateKey: string, type: ShiftType): void {
+export function setShift(
+  dateKey: string,
+  type: ShiftType,
+  hoursWorked?: number
+): void {
   const shifts = loadShifts();
   const existingIndex = shifts.findIndex(s => s.date === dateKey);
+
+  if (type === 'OFF' && (hoursWorked === undefined || hoursWorked <= 0)) {
+    if (existingIndex >= 0) {
+      shifts.splice(existingIndex, 1);
+      saveShifts(shifts);
+    }
+    return;
+  }
+
   const newShift: ShiftDay = { date: dateKey, type };
+  if (typeof hoursWorked === 'number' && hoursWorked > 0) {
+    newShift.hoursWorked = hoursWorked;
+  }
 
   if (existingIndex >= 0) {
-    if (type === 'OFF') {
-      shifts.splice(existingIndex, 1);
-    } else {
-      shifts[existingIndex] = newShift;
-    }
-  } else if (type !== 'OFF') {
+    shifts[existingIndex] = newShift;
+  } else {
     shifts.push(newShift);
   }
 
@@ -59,6 +71,14 @@ function isValidShiftDay(obj: unknown): obj is ShiftDay {
   );
 }
 
+function normalizeShiftDay(day: ShiftDay): ShiftDay {
+  const out: ShiftDay = { date: day.date, type: day.type };
+  if (typeof day.hoursWorked === 'number' && day.hoursWorked > 0) {
+    out.hoursWorked = day.hoursWorked;
+  }
+  return out;
+}
+
 export function seedDemoData(): void {
   const existing = loadShifts();
   if (existing.length > 0) return;
@@ -73,10 +93,10 @@ export function seedDemoDataForced(): void {
   const m = String(month + 1).padStart(2, '0');
 
   const demo: ShiftDay[] = [
-    { date: `${year}-${m}-01`, type: 'WORK' },
+    { date: `${year}-${m}-01`, type: 'WORK', hoursWorked: 8 },
     { date: `${year}-${m}-02`, type: 'REST' },
-    { date: `${year}-${m}-03`, type: 'WORK' },
-    { date: `${year}-${m}-04`, type: 'EXTRA' },
+    { date: `${year}-${m}-03`, type: 'WORK', hoursWorked: 10 },
+    { date: `${year}-${m}-04`, type: 'EXTRA', hoursWorked: 4 },
     { date: `${year}-${m}-05`, type: 'REST' },
   ];
 

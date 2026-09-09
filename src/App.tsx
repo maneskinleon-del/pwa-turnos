@@ -10,7 +10,14 @@ function formatTodayLabel(): string {
 }
 
 function App() {
-  const { loaded, updateShift, getShiftType, reload } = useShifts();
+  const {
+    loaded,
+    updateShift,
+    getShiftType,
+    getShift,
+    config,
+    reload,
+  } = useShifts();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const calendarRef = useRef<CalendarHandle>(null);
@@ -51,7 +58,7 @@ function App() {
   return (
     <div className="h-full flex flex-col items-center bg-slate-950 font-sans antialiased selection:bg-sky-500 selection:text-white">
       <div className="w-full max-w-md h-full min-h-screen bg-slate-900 border-x border-slate-800/80 flex flex-col relative shadow-2xl overflow-x-hidden">
-        {/* Top App Bar — layout matching design: Hoy + demo wand */}
+        {/* Top App Bar */}
         <header className="sticky top-0 z-20 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-lg border border-sky-500/30">
@@ -61,7 +68,7 @@ function App() {
               <h1 className="text-base font-semibold tracking-tight text-white flex items-center gap-1.5">
                 PWA Turnos
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800/60 uppercase">
-                  Fase 1
+                  Fase 3
                 </span>
               </h1>
               <p className="text-[11px] text-slate-400">Calendario & Control de Jornadas</p>
@@ -95,9 +102,13 @@ function App() {
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           getShiftType={getShiftType}
-          onUpdateShift={(dateKey, type) => {
-            updateShift(dateKey, type);
-            showToast(`Día actualizado: ${type}`);
+          getHoursWorked={dateKey => getShift(dateKey)?.hoursWorked}
+          normalHours={config.normalHours}
+          onUpdateShift={(dateKey, type, hours) => {
+            updateShift(dateKey, type, hours);
+            const suffix =
+              typeof hours === 'number' && hours > 0 ? ` · ${hours}h` : '';
+            showToast(`Día actualizado: ${type}${suffix}`);
           }}
         />
 
@@ -105,7 +116,9 @@ function App() {
         <footer className="p-3 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px]">Almacenamiento Local Activo</span>
+            <span className="text-[11px]">
+              Local · jornada {config.normalHours}h
+            </span>
           </div>
           <button
             type="button"

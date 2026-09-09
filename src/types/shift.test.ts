@@ -181,3 +181,24 @@ describe('Timezone safety', () => {
     expect(parsed.getMinutes()).toBe(0);
   });
 });
+import { computeHours, DEFAULT_WORKDAY_CONFIG } from './shift';
+
+describe('computeHours', () => {
+  it('splits 10h against 8h jornada into 8 normal + 2 overtime', () => {
+    expect(computeHours(10, 8)).toEqual({ worked: 10, normal: 8, overtime: 2 });
+  });
+
+  it('returns all normal when under jornada', () => {
+    expect(computeHours(6, 8)).toEqual({ worked: 6, normal: 6, overtime: 0 });
+  });
+
+  it('handles zero / undefined as empty', () => {
+    expect(computeHours(0)).toEqual({ worked: 0, normal: 0, overtime: 0 });
+    expect(computeHours(undefined)).toEqual({ worked: 0, normal: 0, overtime: 0 });
+  });
+
+  it('uses default jornada of 8', () => {
+    expect(DEFAULT_WORKDAY_CONFIG.normalHours).toBe(8);
+    expect(computeHours(9)).toEqual({ worked: 9, normal: 8, overtime: 1 });
+  });
+});

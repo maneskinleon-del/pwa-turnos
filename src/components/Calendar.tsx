@@ -13,7 +13,10 @@ interface CalendarProps {
   selectedDate: string | null;
   onSelectDate: (dateKey: string) => void;
   getShiftType: (dateKey: string) => ShiftType;
-  onUpdateShift: (dateKey: string, type: ShiftType) => void;
+  getHoursWorked?: (dateKey: string) => number | undefined;
+  normalHours?: number;
+  monthHoursSummary?: { worked: number; normal: number; overtime: number; daysWithHours: number };
+  onUpdateShift: (dateKey: string, type: ShiftType, hoursWorked?: number) => void;
 }
 
 export interface CalendarHandle {
@@ -49,7 +52,15 @@ const SHIFT_BADGE: Record<
 };
 
 export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calendar(
-  { selectedDate: _selectedDate, onSelectDate, getShiftType, onUpdateShift },
+  {
+    selectedDate: _selectedDate,
+    onSelectDate,
+    getShiftType,
+    getHoursWorked,
+    normalHours = 8,
+    monthHoursSummary,
+    onUpdateShift,
+  },
   ref
 ) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
@@ -128,6 +139,33 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
     return counts;
   }, [currentYear, currentMonth, daysInMonth, getShiftType]);
 
+  const hoursSummary = useMemo(() => {
+    if (monthHoursSummary) return monthHoursSummary;
+    let worked = 0;
+    let daysWithHours = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = formatDateKey(new Date(currentYear, currentMonth, d));
+      const h = getHoursWorked?.(key);
+      if (typeof h === 'number' && h > 0) {
+        worked += h;
+        daysWithHours += 1;
+      }
+    }
+    const normal = Math.min(worked, daysWithHours * normalHours); // rough if we don't split per day
+    // Proper per-day split:
+    let normalAcc = 0;
+    let overtimeAcc = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = formatDateKey(new Date(currentYear, currentMonth, d));
+      const h = getHoursWorked?.(key);
+      if (typeof h === 'number' && h > 0) {
+        normalAcc += Math.min(h, normalHours);
+        overtimeAcc += Math.max(0, h - normalHours);
+      }
+    }
+    return { worked, normal: normalAcc, overtime: overtimeAcc, daysWithHours };
+  }, [currentYear, currentMonth, daysInMonth, getHoursWorked, normalHours, monthHoursSummary]);
+
   const handleDayClick = (date: Date) => {
     const key = formatDateKey(date);
     setEditorDate(key);
@@ -137,6 +175,7 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
   const renderDayCell = (date: Date) => {
     const key = formatDateKey(date);
     const type = getShiftType(key);
+    const hours = getHoursWorked?.(key);
     const isCurrentMonth =
       date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     const isTodayFlag = isToday(date);
@@ -178,11 +217,18 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
           {isTodayFlag && <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
         </div>
         {badge ? (
-          <div
-            className={`mt-auto flex items-center justify-center gap-0.5 py-0.5 px-1 rounded border text-[9px] font-bold ${badge.badge}`}
-          >
-            <i className={`fa-solid ${badge.icon} text-[8px]`} />
-            <span className="tracking-tight">{badge.short}</span>
+          <div className="mt-auto space-y-0.5">
+            <div
+              className={`flex items-center justify-center gap-0.5 py-0.5 px-1 rounded border text-[9px] font-bold ${badge.badge}`}
+            >
+              <i className={`fa-solid ${badge.icon} text-[8px]`} />
+              <span className="tracking-tight">{badge.short}</span>
+            </div>
+            {typeof hours === 'number' && hours > 0 && isCurrentMonth && (
+              <div className="text-center text-[8px] font-mono text-slate-400 leading-none">
+                {hours}h
+              </div>
+            )}
           </div>
         ) : (
           <div className="mt-auto h-4 flex items-center justify-center text-[10px] text-slate-700">
@@ -266,6 +312,23 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
             </span>
           </div>
         </div>
+
+        {/* Resumen de horas del mes (Fase 3) */}
+        {hoursSummary.daysWithHours > 0 && (
+          <div className="mt-2 flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-slate-950/50 border border-slate-800/70 text-[11px]">
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <i className="fa-solid fa-clock text-sky-400/80 text-[10px]" />
+              <span>Horas mes</span>
+            </div>
+            <div className="flex items-center gap-3 font-mono">
+              <span className="text-slate-300">
+                <span className="text-slate-500">Σ</span> {hoursSummary.worked}h
+              </span>
+              <span className="text-sky-300">{hoursSummary.normal}h n</span>
+              <span className="text-amber-300">{hoursSummary.overtime}h x</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Calendar Grid */}
@@ -299,7 +362,9 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
         <DayEditor
           dateKey={editorDate}
           currentType={getShiftType(editorDate)}
-          onSave={type => onUpdateShift(editorDate, type)}
+          currentHours={getHoursWorked?.(editorDate)}
+          normalHours={normalHours}
+          onSave={(type, hours) => onUpdateShift(editorDate, type, hours)}
           onClose={() => setEditorDate(null)}
         />
       )}
