@@ -1,7 +1,7 @@
 import type { WorkdayConfig } from '@/types/shift';
 import { DEFAULT_WORKDAY_CONFIG } from '@/types/shift';
 
-const CONFIG_KEY = 'pwa-turnos-config';
+const CONFIG_KEY = 'pwa-turnos-config-v2';
 
 export function loadConfig(): WorkdayConfig {
   try {

@@ -57,7 +57,7 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
     onSelectDate,
     getShiftType,
     getHoursWorked,
-    normalHours = 8,
+    normalHours = 12,
     monthHoursSummary,
     onUpdateShift,
   },
@@ -145,9 +145,25 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
     let normalAcc = 0;
     let overtimeAcc = 0;
     let daysWithHours = 0;
+    let extraDays = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const key = formatDateKey(new Date(currentYear, currentMonth, d));
+      const type = getShiftType(key);
       const h = getHoursWorked?.(key);
+      if (type === 'EXTRA') {
+        extraDays += 1;
+        if (typeof h === 'number' && h > 0) {
+          worked += h;
+          overtimeAcc += h; // día extra completo
+          daysWithHours += 1;
+        } else {
+          // sin horas cargadas: igual cuenta el día extra
+          overtimeAcc += normalHours;
+          worked += normalHours;
+          daysWithHours += 1;
+        }
+        continue;
+      }
       if (typeof h === 'number' && h > 0) {
         worked += h;
         normalAcc += Math.min(h, normalHours);
@@ -155,8 +171,22 @@ export const Calendar = forwardRef<CalendarHandle, CalendarProps>(function Calen
         daysWithHours += 1;
       }
     }
-    return { worked, normal: normalAcc, overtime: overtimeAcc, daysWithHours };
-  }, [currentYear, currentMonth, daysInMonth, getHoursWorked, normalHours, monthHoursSummary]);
+    return {
+      worked,
+      normal: normalAcc,
+      overtime: overtimeAcc,
+      daysWithHours,
+      extraDays,
+    };
+  }, [
+    currentYear,
+    currentMonth,
+    daysInMonth,
+    getHoursWorked,
+    getShiftType,
+    normalHours,
+    monthHoursSummary,
+  ]);
 
   const handleDayClick = (date: Date) => {
     const key = formatDateKey(date);

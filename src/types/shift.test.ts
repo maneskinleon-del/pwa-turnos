@@ -184,21 +184,49 @@ describe('Timezone safety', () => {
 import { computeHours, DEFAULT_WORKDAY_CONFIG } from './shift';
 
 describe('computeHours', () => {
-  it('splits 10h against 8h jornada into 8 normal + 2 overtime', () => {
-    expect(computeHours(10, 8)).toEqual({ worked: 10, normal: 8, overtime: 2 });
+  it('WORK: splits hours above jornada into overtime', () => {
+    expect(computeHours(14, 12, 'WORK')).toEqual({
+      worked: 14,
+      normal: 12,
+      overtime: 2,
+      isExtraDay: false,
+    });
   });
 
-  it('returns all normal when under jornada', () => {
-    expect(computeHours(6, 8)).toEqual({ worked: 6, normal: 6, overtime: 0 });
+  it('WORK: all normal when at or under jornada', () => {
+    expect(computeHours(12, 12, 'WORK')).toEqual({
+      worked: 12,
+      normal: 12,
+      overtime: 0,
+      isExtraDay: false,
+    });
+  });
+
+  it('EXTRA: entire day counts as overtime (no normal split)', () => {
+    expect(computeHours(12, 12, 'EXTRA')).toEqual({
+      worked: 12,
+      normal: 0,
+      overtime: 12,
+      isExtraDay: true,
+    });
   });
 
   it('handles zero / undefined as empty', () => {
-    expect(computeHours(0)).toEqual({ worked: 0, normal: 0, overtime: 0 });
-    expect(computeHours(undefined)).toEqual({ worked: 0, normal: 0, overtime: 0 });
+    expect(computeHours(0, 12, 'WORK')).toEqual({
+      worked: 0,
+      normal: 0,
+      overtime: 0,
+      isExtraDay: false,
+    });
+    expect(computeHours(undefined, 12, 'WORK')).toEqual({
+      worked: 0,
+      normal: 0,
+      overtime: 0,
+      isExtraDay: false,
+    });
   });
 
-  it('uses default jornada of 8', () => {
-    expect(DEFAULT_WORKDAY_CONFIG.normalHours).toBe(8);
-    expect(computeHours(9)).toEqual({ worked: 9, normal: 8, overtime: 1 });
+  it('default jornada is 12 (4x4)', () => {
+    expect(DEFAULT_WORKDAY_CONFIG.normalHours).toBe(12);
   });
 });

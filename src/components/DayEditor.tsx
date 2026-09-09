@@ -48,7 +48,7 @@ const OPTIONS: {
   {
     type: 'EXTRA',
     label: 'Turno extra',
-    sub: 'Jornada adicional / refuerzo',
+    sub: 'Día extra completo (pago fijo por día)',
     icon: 'fa-bolt',
     iconBg: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     badge: 'bg-amber-950 text-amber-300 border-amber-800',
@@ -72,9 +72,12 @@ export function DayEditor({
   onClose,
 }: DayEditorProps) {
   const [selectedType, setSelectedType] = useState<ShiftType>(currentType);
-  const [hoursInput, setHoursInput] = useState<string>(
-    currentHours && currentHours > 0 ? String(currentHours) : ''
-  );
+  const [hoursInput, setHoursInput] = useState<string>(() => {
+    if (currentHours && currentHours > 0) return String(currentHours);
+    // Turno extra: por defecto una jornada completa (ej. 12 h)
+    if (currentType === 'EXTRA') return String(normalHours);
+    return '';
+  });
   const [visible, setVisible] = useState(false);
 
   const [year, month, day] = dateKey.split('-').map(Number);
@@ -88,8 +91,16 @@ export function DayEditor({
     (Number.isFinite(parsedHours) && parsedHours >= 0 && parsedHours <= 24);
   const breakdown =
     hoursValid && parsedHours !== undefined && parsedHours > 0
-      ? computeHours(parsedHours, normalHours)
+      ? computeHours(parsedHours, normalHours, selectedType)
       : null;
+
+  const selectType = (type: ShiftType) => {
+    setSelectedType(type);
+    // Al elegir EXTRA sin horas, rellenar jornada completa
+    if (type === 'EXTRA' && (hoursInput === '' || Number(hoursInput) <= 0)) {
+      setHoursInput(String(normalHours));
+    }
+  };
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
@@ -168,7 +179,7 @@ export function DayEditor({
               <button
                 key={opt.type}
                 type="button"
-                onClick={() => setSelectedType(opt.type)}
+                onClick={() => selectType(opt.type)}
                 className={`w-full flex items-center justify-between p-3 rounded-xl border cursor-pointer transition active:scale-[0.99] text-left ${
                   selected
                     ? 'border-sky-500 bg-sky-950/30'
@@ -209,18 +220,44 @@ export function DayEditor({
           })}
         </div>
 
-        {/* Horas trabajadas (Fase 3) */}
+        {/* Horas (Fase 3) — WORK parte por jornada; EXTRA es día completo */}
         {showHoursField && (
           <div className="mb-5 p-3 rounded-xl border border-slate-800 bg-slate-950/60">
-            <label
-              htmlFor="hours-worked"
-              className="block text-xs font-semibold text-slate-300 mb-2"
-            >
-              Horas trabajadas
-              <span className="ml-1.5 font-normal text-slate-500">
-                (jornada normal: {normalHours} h)
-              </span>
-            </label>
+            {selectedType === 'EXTRA' ? (
+              <>
+                <div className="flex items-start gap-2 mb-2">
+                  <i className="fa-solid fa-bolt text-amber-400 text-sm mt-0.5" />
+                  <div>
+                    <div className="text-xs font-semibold text-amber-300">
+                      Día extra completo
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      No se resta jornada normal. Las horas van enteras como extra
+                      (pago fijo por día, ej. 40k).
+                    </p>
+                  </div>
+                </div>
+                <label
+                  htmlFor="hours-worked"
+                  className="block text-xs font-semibold text-slate-300 mb-2"
+                >
+                  Horas del turno extra
+                  <span className="ml-1.5 font-normal text-slate-500">
+                    (sugerido: {normalHours} h)
+                  </span>
+                </label>
+              </>
+            ) : (
+              <label
+                htmlFor="hours-worked"
+                className="block text-xs font-semibold text-slate-300 mb-2"
+              >
+                Horas trabajadas
+                <span className="ml-1.5 font-normal text-slate-500">
+                  (jornada: {normalHours} h · lo que pase de eso = extra)
+                </span>
+              </label>
+            )}
             <div className="flex items-center gap-2">
               <input
                 id="hours-worked"
@@ -229,7 +266,7 @@ export function DayEditor({
                 min={0}
                 max={24}
                 step={0.5}
-                placeholder="0"
+                placeholder={String(normalHours)}
                 value={hoursInput}
                 onChange={e => setHoursInput(e.target.value)}
                 className="w-24 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-sm font-mono focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/40"
@@ -241,7 +278,7 @@ export function DayEditor({
                 Ingresa un valor entre 0 y 24
               </p>
             )}
-            {breakdown && (
+            {breakdown && selectedType === 'WORK' && (
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-slate-900/80 border border-slate-800 py-1.5 px-1">
                   <div className="text-[10px] uppercase tracking-wider text-slate-500">
@@ -261,11 +298,21 @@ export function DayEditor({
                 </div>
                 <div className="rounded-lg bg-slate-900/80 border border-slate-800 py-1.5 px-1">
                   <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                    Extra
+                    Sobre jornada
                   </div>
                   <div className="text-sm font-mono font-bold text-amber-300">
                     {breakdown.overtime} h
                   </div>
+                </div>
+              </div>
+            )}
+            {breakdown && selectedType === 'EXTRA' && (
+              <div className="mt-3 rounded-lg bg-amber-950/40 border border-amber-800/50 py-2 px-3 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-amber-400/80">
+                  Día extra · {breakdown.worked} h
+                </div>
+                <div className="text-sm font-semibold text-amber-200 mt-0.5">
+                  1 día extra (sin jornada normal)
                 </div>
               </div>
             )}

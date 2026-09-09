@@ -93,10 +93,10 @@ export function seedDemoDataForced(): void {
   const m = String(month + 1).padStart(2, '0');
 
   const demo: ShiftDay[] = [
-    { date: `${year}-${m}-01`, type: 'WORK', hoursWorked: 8 },
+    { date: `${year}-${m}-01`, type: 'WORK', hoursWorked: 12 },
     { date: `${year}-${m}-02`, type: 'REST' },
-    { date: `${year}-${m}-03`, type: 'WORK', hoursWorked: 10 },
-    { date: `${year}-${m}-04`, type: 'EXTRA', hoursWorked: 4 },
+    { date: `${year}-${m}-03`, type: 'WORK', hoursWorked: 12 },
+    { date: `${year}-${m}-04`, type: 'EXTRA', hoursWorked: 12 },
     { date: `${year}-${m}-05`, type: 'REST' },
   ];
 

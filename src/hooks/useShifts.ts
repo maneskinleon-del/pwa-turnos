@@ -83,11 +83,13 @@ export function useShifts() {
 
       for (const s of shifts) {
         if (!s.date.startsWith(prefix)) continue;
-        if (typeof s.hoursWorked !== 'number' || s.hoursWorked <= 0) continue;
-        const h = computeHours(s.hoursWorked, config.normalHours);
-        worked += h.worked;
+        const h = computeHours(s.hoursWorked, config.normalHours, s.type);
+        if (h.worked <= 0 && s.type !== 'EXTRA') continue;
+        worked += h.worked || (s.type === 'EXTRA' ? config.normalHours : 0);
         normal += h.normal;
-        overtime += h.overtime;
+        overtime +=
+          h.overtime ||
+          (s.type === 'EXTRA' && h.worked <= 0 ? config.normalHours : 0);
         daysWithHours += 1;
       }
 
